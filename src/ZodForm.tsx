@@ -4,20 +4,20 @@ import './App.css'
 import { z } from 'zod'
 const schema = z
   .object({
-    email: z.string().min(1, { message: '必填欄位' }),
-    password: z.string({}).min(6, { message: '長度至少6碼' }),
+    email: z.string().min(1, { message: 'Zod 必填欄位' }),
+    password: z.string({}).min(6, { message: 'Zod 長度至少6碼' }),
     confirmPassword: z.string(),
     checkFields: z
       .array(
         z.object({
           id: z.number(),
-          name: z.string().min(1, { message: '檢查欄位內每項必填' }),
+          name: z.string().min(1, { message: 'Zod 檢查欄位內每項必填' }),
         })
       )
       .nullable(),
   })
   .refine((data) => data.password !== data.confirmPassword, {
-    message: '密碼不一致',
+    message: 'Zod 密碼不一致',
     path: ['confirmPassword'],
   })
 
