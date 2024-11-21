@@ -12,7 +12,7 @@
 
 ## 使用 react-hook-form validation
 
-```tsx=
+```jsx=
 /* HookForm.tsx */
 import { useForm, useFieldArray, SubmitHandler } from 'react-hook-form'
 import './App.css'
@@ -174,7 +174,7 @@ handleSubmit(onSubmit)()
 
 ## 使用 schema validation Zod
 
-```tsx=
+```jsx=
 import { useForm, SubmitHandler } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import './App.css'
@@ -206,6 +206,7 @@ function ZodForm() {
     register,
     handleSubmit,
     watch,
+    trigger,
     setValue,
     formState: { errors },
   } = useForm<Inputs>({
@@ -255,6 +256,11 @@ function ZodForm() {
                     if (!checkFields) return
                     const newCheckFields = checkFields.filter((item) => item?.id !== field?.id)
                     setValue('checkFields', newCheckFields)
+                    /* trigger 這邊因為是每當 onChange 就即時驗證，因此當刪除時因為是 index 關係，後面的項目吃到前面的 index
+                      例如 checkFields 有三筆資料都驗證錯誤，當第二筆(index:1) 填寫資料後刪除，會導致第三筆(index:2) 驗證錯誤資訊不見( 因為 index:1 現在是正確的 )
+                      因此需要重新觸發驗證
+                    */
+                    trigger('checkFields')
                   }}
                 >
                   刪除
@@ -299,6 +305,33 @@ export default ZodForm
 
 **Zod 簡單來說就是一套 TypeScript 友好的驗證套件**，我們只需要定義好 Schema 就能「產生出型別」與「應用在驗證」上面，減少還需要自己定義 TypeScript 以及未來更動時還要同部調整的麻煩。只需要修改 Schema 就可以一併處理。
 
+### 如何搭配 react-hook-form
+
+首先需要將 `zod` 與 `@hookform/resolvers` 套件加入到專案中並且引入 `z` 與 `zodResolver`。
+
+> `npm i zod @hookform/resolvers`
+
+```tsx=
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
+```
+
+接著將 `react-hook-form` 的 `useForm` 增加 `resolver` 參數並且將 `zodResolver(schema)` 放入即可。
+
+```tsx=
+ // 使用 z 來定義 schema
+ const schema = z.object({
+     name: z.string()
+ })
+ const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<Inputs>({
+    resolver: zodResolver(schema),  // 這段～～～
+  })
+```
+
 ### Basic Type 使用
 
 Zod 也封裝許多常見的驗證函式，例如：長度(`min`,`max`,`length`)、時間(`date`,`time`)、格式(`email`,`url`,`regix`)...等。
@@ -318,7 +351,8 @@ Zod 也封裝許多常見的驗證函式，例如：長度(`min`,`max`,`length`)
 ```js=
 const passwordSchema = z.string().min(6, { message: '長度至少6碼' })
 const emailSchema = z.string().email({ message: 'email 不符' })
-console.log(passwordSchema.safeParse('1234')) // {success: false, error: .... }
+console.log(passwordSchema.safeParse('1234')) // {success: false, error: .... } 可用 result.error.format() 轉換為 object
+
 console.log(emailSchema.safeParse('lib')) // throw Error
 
 ```
@@ -327,15 +361,23 @@ console.log(emailSchema.safeParse('lib')) // throw Error
 >
 > - 使用 `parse` 時，當驗證錯誤時會直接 throw Error 因此需要用 try/catch 來包住，以免值接白屏。
 >
-> - 使用 `safeParse` 時，當驗證錯誤時會回傳 `{success: 'false', error: {.....}}` 的結構，不過 error 這邊是字串，因此需要用 JSON.parse 轉換一下。
+> - 使用 `safeParse` 時，當驗證錯誤時會回傳 `{success: 'false', error: {.....}}` 的結構，不過 error 需要用 `format()` 轉換成物件形式。
 
 ### Reference Types 使用
 
 **Zod** 最方便的操作地方其實在於 `Array`、`Object` 上的操作，還記得上面使用 `react-hook-form` 時，我們要處理「動態新增欄位」需要透過 `useFieldArray` 提供的函式來新增刪減，但這對「既有的程式」或是「單純用 js 寫的程式」都不是特別方便，會需要改寫原本的寫法來符合 `useFieldArray` 的方式。
 
-然而使用 Zod 則只需要很直覺的定義好 Array Object 結構就可以了，像是上面範例 `checkFields` 的設定一樣。
+> **補充： 這邊有一個重要的需要注意**
+> 當我們不是用 `useFieldArray` 而是自己使用 map 來處理時，因為會使用 `index` 來做 `register`
+>
+> ` <input {...register(`checkFields.${index}.name`)}/> // 動態註冊`
+>
+> 因此當刪除時會需要再 `trigger` **不然會使後面項目吃到前面的驗證狀態**
 
-> 簡單解釋一下 `checkFields` 驗證設定：
+然而使用 Zod 則只需要很直覺的定義好 Array object 結構就可以了，像是上面範例的 `checkFields` 設定一樣。
+
+> **簡單說明一下 `checkFields` 驗證設定代表的意思：**
+>
 > `checkFields` 要是一個 Array 類型或是 null，如果是 Array 則裡面要有一個 Object 型態並且包含了 `id` 與 `name` 兩個欄位：
 >
 > - id 要是 Number 型態
@@ -359,15 +401,44 @@ const schema = z
   })
 ```
 
+### 欄位需要互相比較
+
+很多時候在驗證時我們需要與其他輸入欄位比較，像是範例的 `password` 與 `confrimPassword` 就是一個典型的例子，`confrimPassword` 需要去驗證是否輸入的內容與 `password` 一致，這時就需要用到 **`refine()`** 這個函式的幫忙了，我們直接看範例。
+
+```tsx=
+const schema = z
+  .object({
+    password: z.string(),
+    confirmPassword: z.string(),
+    ...審略...
+  })
+  .refine((data) => data.password !== data.confirmPassword, {
+    message: 'Zod 密碼不一致',
+    path: ['confirmPassword'], // 指定錯誤是在哪個欄位上
+  })
+```
+
+### Schema 轉 Typescript Type
+
+最後當我們定義好 Schema 後，再來就可以透過 `z.infer<typeof schema>` 將 Schema 無痛轉換成 Type 拿給 `useForm` 來使用了，
+
+```typescript=
+type Inputs = z.infer<typeof schema>
+
+function ZodForm() {
+  const { ...審略...  } = useForm<Inputs>({...審略...})
+ }
+```
+
 ## Demo
 
-![react-hook-form-zod](https://hackmd.io/_uploads/H1eq22tM1x.gif)
+![IA3VT71-Imgur-ezgif.com-video-to-gif-converter (5)](https://hackmd.io/_uploads/Hy_xbM5Gkl.gif)
 
 ## Conclusion
 
 兩者各別實作下來，可以注意到`react-hook-form` 是將驗證機制寫在註冊(register) 到 DOM 元件上的時候，因此每個欄位的驗證會散落在每個 input 區塊中，而 `Zod` 是將所有欄位的驗證設定寫在一起，一併設定到 `useForm resolver` 上面，兩者的寫法有好有壞還是要看團隊普遍喜歡哪種攥寫方式。
 
-不可否認的是 `Zod` 在表單複雜的情境下會比 `react-hook-form` 來的簡潔與方便，更何況是有用 TypeScript 專案下程式碼的量會少更多（_因為不用額外寫 Type_）
+不可否認的是 `Zod` 在表單複雜的情境下會比 `react-hook-form` 來的簡潔與方便，更何況是有用 TypeScript 的專案下會更加便利。（_因為不用再額外定義 Type 了_），因此如果有使用 `react-hook-form` 的話我個人是會推薦順便導入 Zod 這套好用的驗證套件。
 
 Github：https://github.com/librarylai/hook-form-zod
 

@@ -30,6 +30,7 @@ function ZodForm() {
     handleSubmit,
     watch,
     setValue,
+    trigger,
     formState: { errors },
   } = useForm<Inputs>({
     resolver: zodResolver(schema),
@@ -78,6 +79,11 @@ function ZodForm() {
                     if (!checkFields) return
                     const newCheckFields = checkFields.filter((item) => item?.id !== field?.id)
                     setValue('checkFields', newCheckFields)
+                    /* trigger 這邊因為是每當 onChange 就即時驗證，因此當刪除時因為是 index 關係，後面的項目吃到前面的 index
+                      例如 checkFields 有三筆資料都驗證錯誤，當第二筆(index:1) 填寫資料後刪除，會導致第三筆(index:2) 驗證錯誤資訊不見( 因為 index:1 現在是正確的 )
+                      因此需要重新觸發驗證                
+                    */
+                    trigger('checkFields')
                   }}
                 >
                   刪除
