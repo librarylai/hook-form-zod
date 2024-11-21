@@ -440,7 +440,9 @@ function ZodForm() {
 
 不可否認的是 `Zod` 在表單複雜的情境下會比 `react-hook-form` 來的簡潔與方便，更何況是有用 TypeScript 的專案下會更加便利。（_因為不用再額外定義 Type 了_），因此如果有使用 `react-hook-form` 的話我個人是會推薦順便導入 Zod 這套好用的驗證套件。
 
-Github：https://github.com/librarylai/hook-form-zod
+#### 以上就是本篇『React-hook-form 搭配 Zod 表單驗證』的全部內容，之後有空會再看看裡面還有哪些好用的 Hook 或是 Function，到時再來補充給大家，如有任何錯誤的地方也再麻煩告知，謝謝您的觀看。
+
+#### Github：https://github.com/librarylai/hook-form-zod
 
 ## Reference
 
